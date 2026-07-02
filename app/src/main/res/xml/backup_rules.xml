@@ -1,0 +1,3 @@
+<full-backup-content>
+    <exclude domain="database" path="restopulse.db" />
+</full-backup-content>

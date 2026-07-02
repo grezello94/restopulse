@@ -1,0 +1,3 @@
+-keep class dagger.hilt.** { *; }
+-keep class androidx.room.** { *; }
+-keep class com.redlantern.restopulse.data.database.entities.** { *; }
