@@ -10,7 +10,9 @@ class CustomerUseCases @Inject constructor(
     private val groups: MarketingGroupRepository
 ) {
     suspend fun addDiscoveredCustomer(call: CallHistoryEntity): Long {
-        val id = customers.addCustomerFromCall(call)
+        val customer = customers.importUnknownFromCall(call, customers.nextAvailableGeneratedNumber())
+            ?: return -1
+        val id = customer.id
         if (id > 0) customers.setGroup(id, groups.ensureGroupForNewCustomer())
         return id
     }

@@ -40,7 +40,7 @@ class CustomerActionReceiver : BroadcastReceiver() {
                             )
                         )
                         if (id > 0) {
-                            notifications.showSimple("Customer Added", "$number was added to RestoPulse")
+                            notifications.showSimple("Contact Saved", "$number was saved to the phone contact book")
                         } else {
                             notifications.showSimple("Duplicate Prevented", "$number already exists")
                         }

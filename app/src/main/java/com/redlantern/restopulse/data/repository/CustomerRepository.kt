@@ -45,6 +45,31 @@ class CustomerRepository @Inject constructor(
         return customerDao.insertOrDuplicate(customer)
     }
 
+    /** Creates both the CRM customer and its corresponding Android contact. */
+    suspend fun importUnknownFromCall(call: CallHistoryEntity, generatedNumber: Int): CustomerEntity? {
+        if (customerDao.findByNormalized(call.normalizedNumber) != null ||
+            contacts.contactExists(call.phoneNumber) ||
+            isIgnored(call.normalizedNumber)
+        ) return null
+
+        val name = "RL Customer $generatedNumber"
+        contacts.addContact(name, call.phoneNumber)
+        val customer = CustomerEntity(
+            name = name,
+            phoneNumber = call.phoneNumber,
+            normalizedNumber = call.normalizedNumber,
+            dateAdded = System.currentTimeMillis(),
+            lastCallDate = call.callDate,
+            lastCallDuration = call.durationSeconds,
+            whatsappAvailable = whatsAppChecker.canOpenChat(call.normalizedNumber)
+        )
+        val id = customerDao.insertOrDuplicate(customer)
+        return if (id == -1L) null else customer.copy(id = id)
+    }
+
+    fun nextAvailableGeneratedNumber(): Int = contacts.nextAvailableCustomerNumber()
+    fun isAndroidContact(number: String): Boolean = contacts.contactExists(number)
+
     suspend fun save(customer: CustomerEntity) = customerDao.update(customer)
     suspend fun ignore(number: String, normalized: String) = customerDao.insertIgnored(IgnoredNumberEntity(normalized, number, System.currentTimeMillis()))
     suspend fun isIgnored(normalized: String): Boolean = customerDao.findIgnored(normalized) != null

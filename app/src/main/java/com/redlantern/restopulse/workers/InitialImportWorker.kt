@@ -15,7 +15,7 @@ class InitialImportWorker @AssistedInject constructor(
     private val calls: CallRepository
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = runCatching {
-        calls.importRecent()
+        calls.importAllAndCreateContacts()
         Result.success()
     }.getOrElse { Result.retry() }
 }

@@ -24,3 +24,7 @@ local.properties
 captures/
 *.hprof
 *.ap_
+
+# Portable local JDK used for Android builds
+.jdk17/
+jdk17.zip

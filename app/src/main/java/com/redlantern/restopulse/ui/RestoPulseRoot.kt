@@ -50,6 +50,7 @@ private data class NavItem(val route: Route, val label: String, val icon: androi
 @Composable
 fun RestoPulseRoot() {
     val scheduler = hiltViewModel<com.redlantern.restopulse.viewmodels.WorkSchedulerViewModel>().scheduler
+    val initialImport = hiltViewModel<com.redlantern.restopulse.viewmodels.InitialImportViewModel>()
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(PermissionManager.requiredPermissions.all {
@@ -61,7 +62,7 @@ fun RestoPulseRoot() {
     }
     LaunchedEffect(granted) {
         if (granted) {
-            scheduler.enqueueInitialImport()
+            initialImport.startImport()
             scheduler.schedulePeriodicSync()
         }
     }

@@ -16,7 +16,7 @@ class CallLogDataSource @Inject constructor(
 ) {
     fun latestCall(): CallHistoryEntity? = read(limit = 1).firstOrNull()
 
-    fun read(limit: Int = 300): List<CallHistoryEntity> {
+    fun read(limit: Int? = 300): List<CallHistoryEntity> {
         val projection = arrayOf(
             CallLog.Calls.NUMBER,
             CallLog.Calls.CACHED_NAME,
@@ -30,7 +30,7 @@ class CallLogDataSource @Inject constructor(
             projection,
             null,
             null,
-            "${CallLog.Calls.DATE} DESC LIMIT $limit"
+            "${CallLog.Calls.DATE} DESC"
         )?.use { cursor ->
             val numberIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)
             val nameIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME)
@@ -38,6 +38,7 @@ class CallLogDataSource @Inject constructor(
             val dateIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)
             val durationIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)
             while (cursor.moveToNext()) {
+                if (limit != null && results.size >= limit) break
                 val number = cursor.getString(numberIndex).orEmpty()
                 val normalized = normalizer.normalize(number)
                 if (normalized.isBlank()) continue

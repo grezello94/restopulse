@@ -13,6 +13,8 @@ class ContactsDataSource @Inject constructor(
     @ApplicationContext private val context: Context,
     private val normalizer: PhoneNumberNormalizer
 ) {
+    private val generatedName = Regex("^RL Customer (\\d+)$", RegexOption.IGNORE_CASE)
+
     fun contactExists(rawNumber: String): Boolean {
         val target = normalizer.normalize(rawNumber)
         if (target.isBlank()) return false
@@ -51,5 +53,26 @@ class ContactsDataSource @Inject constructor(
             .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE)
             .build()
         context.contentResolver.applyBatch(ContactsContract.AUTHORITY, operations)
+    }
+
+    /** Returns the lowest available positive number in the RL Customer name sequence. */
+    fun nextAvailableCustomerNumber(): Int {
+        val used = mutableSetOf<Int>()
+        context.contentResolver.query(
+            ContactsContract.Contacts.CONTENT_URI,
+            arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+            while (cursor.moveToNext()) {
+                generatedName.matchEntire(cursor.getString(nameIndex).orEmpty().trim())
+                    ?.groupValues?.getOrNull(1)?.toIntOrNull()?.let(used::add)
+            }
+        }
+        var candidate = 1
+        while (candidate in used) candidate++
+        return candidate
     }
 }

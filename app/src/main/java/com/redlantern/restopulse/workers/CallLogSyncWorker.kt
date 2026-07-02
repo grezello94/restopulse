@@ -20,7 +20,11 @@ class CallLogSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = runCatching {
         val latest = calls.importLatest()
-        if (latest != null && customers.findByNormalized(latest.normalizedNumber) == null && !customers.isIgnored(latest.normalizedNumber)) {
+        if (latest != null &&
+            customers.findByNormalized(latest.normalizedNumber) == null &&
+            !customers.isAndroidContact(latest.phoneNumber) &&
+            !customers.isIgnored(latest.normalizedNumber)
+        ) {
             notifications.showNewCustomer(latest.phoneNumber, latest.normalizedNumber)
         }
         Result.success()

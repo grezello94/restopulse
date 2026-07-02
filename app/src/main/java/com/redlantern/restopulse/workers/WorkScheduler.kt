@@ -18,7 +18,7 @@ class WorkScheduler @Inject constructor(
     fun enqueueInitialImport() {
         workManager.enqueueUniqueWork(
             "initial-call-import",
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<InitialImportWorker>().build()
         )
     }
