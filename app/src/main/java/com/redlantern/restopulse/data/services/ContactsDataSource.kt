@@ -15,6 +15,42 @@ class ContactsDataSource @Inject constructor(
 ) {
     private val generatedName = Regex("^RL Customer (\\d+)$", RegexOption.IGNORE_CASE)
 
+    data class PhoneContact(val name: String, val phoneNumber: String, val normalizedNumber: String)
+
+    /** Reads the complete visible phone book and collapses differently formatted copies of a number. */
+    fun readUniqueContacts(): List<PhoneContact> {
+        val contacts = linkedMapOf<String, PhoneContact>()
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
+        )
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            null,
+            null,
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " COLLATE NOCASE"
+        )?.use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val numberIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (cursor.moveToNext()) {
+                val number = cursor.getString(numberIndex).orEmpty()
+                val normalized = normalizer.normalize(number)
+                if (normalized.isNotBlank()) {
+                    contacts.putIfAbsent(
+                        normalized,
+                        PhoneContact(
+                            name = cursor.getString(nameIndex).orEmpty().ifBlank { number },
+                            phoneNumber = number,
+                            normalizedNumber = normalized
+                        )
+                    )
+                }
+            }
+        }
+        return contacts.values.toList()
+    }
+
     fun contactExists(rawNumber: String): Boolean {
         val target = normalizer.normalize(rawNumber)
         if (target.isBlank()) return false

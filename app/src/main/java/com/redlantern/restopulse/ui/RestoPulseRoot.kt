@@ -37,6 +37,7 @@ import androidx.navigation.navArgument
 import com.redlantern.restopulse.permissions.PermissionManager
 import com.redlantern.restopulse.ui.navigation.Route
 import com.redlantern.restopulse.ui.screens.AnalyticsScreen
+import com.redlantern.restopulse.ui.screens.BroadcastBatchScreen
 import com.redlantern.restopulse.ui.screens.CallsScreen
 import com.redlantern.restopulse.ui.screens.CustomerDetailScreen
 import com.redlantern.restopulse.ui.screens.CustomersScreen
@@ -107,7 +108,13 @@ fun RestoPulseRoot() {
             composable(Route.Dashboard.path) { DashboardScreen(padding, onCustomer = { navController.navigate(Route.Customers.path) }) }
             composable(Route.Customers.path) { CustomersScreen(padding, onOpen = { navController.navigate(Route.CustomerDetail.create(it)) }) }
             composable(Route.Calls.path) { CallsScreen(padding) }
-            composable(Route.Groups.path) { GroupsScreen(padding) }
+            composable(Route.Groups.path) {
+                GroupsScreen(padding, onOpen = { navController.navigate(Route.BroadcastBatch.create(it)) })
+            }
+            composable(
+                Route.BroadcastBatch.path,
+                arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            ) { BroadcastBatchScreen(padding, onBack = { navController.popBackStack() }) }
             composable(Route.Analytics.path) { AnalyticsScreen(padding) }
             composable(Route.Settings.path) { SettingsScreen(padding) }
             composable(
