@@ -31,7 +31,8 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // Keep development builds installable beside older/test RestoPulse packages.
+            applicationIdSuffix = ".broadcast"
             versionNameSuffix = "-debug"
         }
     }

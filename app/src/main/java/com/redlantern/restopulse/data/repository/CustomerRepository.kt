@@ -10,6 +10,8 @@ import com.redlantern.restopulse.data.services.WhatsAppChecker
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class CustomerRepository @Inject constructor(
@@ -26,6 +28,26 @@ class CustomerRepository @Inject constructor(
     fun observeWhatsappCount(): Flow<Int> = customerDao.observeWhatsappCount()
     fun observeNonWhatsappCount(): Flow<Int> = customerDao.observeNonWhatsappCount()
     fun observeDuplicateCount(): Flow<Int> = customerDao.observeDuplicateCount()
+
+    /** Imports every unique Android contact that is not already represented in the CRM. */
+    suspend fun importPhoneBook(): Int = withContext(Dispatchers.IO) {
+        var imported = 0
+        contacts.readUniqueContacts().forEach { contact ->
+            if (customerDao.findByNormalized(contact.normalizedNumber) == null) {
+                val id = customerDao.insert(
+                    CustomerEntity(
+                        name = contact.name,
+                        phoneNumber = contact.phoneNumber,
+                        normalizedNumber = contact.normalizedNumber,
+                        dateAdded = System.currentTimeMillis(),
+                        whatsappAvailable = false
+                    )
+                )
+                if (id > 0) imported++
+            }
+        }
+        imported
+    }
 
     suspend fun addCustomerFromCall(call: CallHistoryEntity): Long {
         val existing = customerDao.findByNormalized(call.normalizedNumber)

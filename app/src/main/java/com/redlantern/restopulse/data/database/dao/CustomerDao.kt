@@ -31,6 +31,12 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE id = :id")
     fun observeCustomer(id: Long): Flow<CustomerEntity?>
 
+    @Query("SELECT * FROM customers WHERE groupId = :groupId ORDER BY dateAdded, id")
+    fun observeCustomersInGroup(groupId: Long): Flow<List<CustomerEntity>>
+
+    @Query("SELECT * FROM customers WHERE groupId IS NULL ORDER BY dateAdded, id")
+    suspend fun unassignedCustomers(): List<CustomerEntity>
+
     @Query("SELECT * FROM customers WHERE normalizedNumber = :normalized LIMIT 1")
     suspend fun findByNormalized(normalized: String): CustomerEntity?
 

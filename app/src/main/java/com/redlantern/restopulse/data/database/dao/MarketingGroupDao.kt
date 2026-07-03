@@ -12,6 +12,9 @@ interface MarketingGroupDao {
     @Query("SELECT * FROM marketing_groups ORDER BY id")
     fun observeGroups(): Flow<List<MarketingGroupEntity>>
 
+    @Query("SELECT * FROM marketing_groups ORDER BY id")
+    suspend fun all(): List<MarketingGroupEntity>
+
     @Query("SELECT COUNT(*) FROM customers WHERE groupId = :groupId")
     suspend fun size(groupId: Long): Int
 
