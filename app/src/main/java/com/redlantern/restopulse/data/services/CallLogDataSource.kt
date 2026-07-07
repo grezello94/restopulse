@@ -16,7 +16,13 @@ class CallLogDataSource @Inject constructor(
 ) {
     fun latestCall(): CallHistoryEntity? = read(limit = 1).firstOrNull()
 
-    fun read(limit: Int? = 300): List<CallHistoryEntity> {
+    fun read(limit: Int? = 300): List<CallHistoryEntity> = readInternal(limit, null)
+
+    /** Scans the provider cursor but retains only one normalized number in memory. */
+    fun readForNormalized(normalizedNumber: String): List<CallHistoryEntity> =
+        readInternal(limit = null, normalizedTarget = normalizedNumber)
+
+    private fun readInternal(limit: Int?, normalizedTarget: String?): List<CallHistoryEntity> {
         val projection = arrayOf(
             CallLog.Calls.NUMBER,
             CallLog.Calls.CACHED_NAME,
@@ -42,6 +48,7 @@ class CallLogDataSource @Inject constructor(
                 val number = cursor.getString(numberIndex).orEmpty()
                 val normalized = normalizer.normalize(number)
                 if (normalized.isBlank()) continue
+                if (normalizedTarget != null && normalized != normalizedTarget) continue
                 results += CallHistoryEntity(
                     customerId = null,
                     phoneNumber = number,

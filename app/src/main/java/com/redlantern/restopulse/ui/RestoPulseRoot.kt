@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,7 +52,6 @@ private data class NavItem(val route: Route, val label: String, val icon: androi
 @Composable
 fun RestoPulseRoot() {
     val scheduler = hiltViewModel<com.redlantern.restopulse.viewmodels.WorkSchedulerViewModel>().scheduler
-    val initialImport = hiltViewModel<com.redlantern.restopulse.viewmodels.InitialImportViewModel>()
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(PermissionManager.requiredPermissions.all {
@@ -62,7 +63,7 @@ fun RestoPulseRoot() {
     }
     LaunchedEffect(granted) {
         if (granted) {
-            initialImport.startImport()
+            scheduler.enqueueInitialImport()
             scheduler.schedulePeriodicSync()
         }
     }
@@ -83,7 +84,7 @@ fun RestoPulseRoot() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 val backStack by navController.currentBackStackEntryAsState()
                 val current = backStack?.destination
                 items.forEach { item ->
@@ -97,7 +98,12 @@ fun RestoPulseRoot() {
                             }
                         },
                         icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) }
+                        label = { Text(item.label) },
+                        alwaysShowLabel = false,
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     )
                 }
             }

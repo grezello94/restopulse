@@ -46,6 +46,9 @@ interface CustomerDao {
     @Query("SELECT COUNT(*) FROM customers WHERE whatsappAvailable = 0")
     fun observeNonWhatsappCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM customers WHERE name LIKE 'RL Frq Customer %' OR name LIKE 'RL ____ Frq Customer %'")
+    fun observeFrequentCount(): Flow<Int>
+
     @Query("SELECT COUNT(*) FROM duplicate_events")
     fun observeDuplicateCount(): Flow<Int>
 
@@ -66,6 +69,9 @@ interface CustomerDao {
 
     @Query("UPDATE customers SET groupId = :groupId WHERE id = :customerId")
     suspend fun updateGroup(customerId: Long, groupId: Long?)
+
+    @Query("UPDATE customers SET name = :name WHERE normalizedNumber = :normalized")
+    suspend fun updateNameByNormalized(normalized: String, name: String)
 
     @Query("DELETE FROM customers WHERE id = :customerId")
     suspend fun delete(customerId: Long)

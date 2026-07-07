@@ -11,6 +11,9 @@ import javax.inject.Inject
 class BootReceiver : BroadcastReceiver() {
     @Inject lateinit var scheduler: WorkScheduler
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) scheduler.schedulePeriodicSync()
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            scheduler.schedulePeriodicSync()
+            scheduler.enqueueInitialImport()
+        }
     }
 }

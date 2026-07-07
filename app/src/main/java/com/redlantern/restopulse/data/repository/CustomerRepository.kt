@@ -25,6 +25,7 @@ class CustomerRepository @Inject constructor(
     fun observeNewSince(start: Long): Flow<Int> = customerDao.observeNewSince(start)
     fun observeWhatsappCount(): Flow<Int> = customerDao.observeWhatsappCount()
     fun observeNonWhatsappCount(): Flow<Int> = customerDao.observeNonWhatsappCount()
+    fun observeFrequentCount(): Flow<Int> = customerDao.observeFrequentCount()
     fun observeDuplicateCount(): Flow<Int> = customerDao.observeDuplicateCount()
 
     suspend fun addCustomerFromCall(call: CallHistoryEntity): Long {
@@ -45,15 +46,20 @@ class CustomerRepository @Inject constructor(
         return customerDao.insertOrDuplicate(customer)
     }
 
-    /** Creates both the CRM customer and its corresponding Android contact. */
-    suspend fun importUnknownFromCall(call: CallHistoryEntity, generatedNumber: Int): CustomerEntity? {
-        if (customerDao.findByNormalized(call.normalizedNumber) != null ||
-            contacts.contactExists(call.phoneNumber) ||
-            isIgnored(call.normalizedNumber)
-        ) return null
+    /** Indexes a saved contact, or creates a contact for a previously unknown caller. */
+    suspend fun importUnknownFromCall(
+        call: CallHistoryEntity,
+        generatedNumber: Int,
+        existingAndroidNumbers: MutableSet<String>? = null
+    ): CustomerEntity? {
+        if (customerDao.findByNormalized(call.normalizedNumber) != null || isIgnored(call.normalizedNumber)) return null
 
-        val name = "RL Customer $generatedNumber"
-        contacts.addContact(name, call.phoneNumber)
+        val alreadySaved = existingAndroidNumbers?.contains(call.normalizedNumber) ?: contacts.contactExists(call.phoneNumber)
+        val name = if (alreadySaved) {
+            call.callerName.ifBlank { call.phoneNumber }
+        } else {
+            "RL Customer $generatedNumber [${call.normalizedNumber.takeLast(4)}]"
+        }
         val customer = CustomerEntity(
             name = name,
             phoneNumber = call.phoneNumber,
@@ -61,19 +67,66 @@ class CustomerRepository @Inject constructor(
             dateAdded = System.currentTimeMillis(),
             lastCallDate = call.callDate,
             lastCallDuration = call.durationSeconds,
-            whatsappAvailable = whatsAppChecker.canOpenChat(call.normalizedNumber)
+            whatsappAvailable = runCatching { whatsAppChecker.canOpenChat(call.normalizedNumber) }.getOrDefault(false)
         )
         val id = customerDao.insertOrDuplicate(customer)
-        return if (id == -1L) null else customer.copy(id = id)
+        if (id == -1L) return null
+
+        // Save RestoPulse's own row first so Home updates quickly. Android
+        // Contacts writes are slower and device-dependent, so they must not
+        // block the dashboard counters.
+        if (!alreadySaved) {
+            if (existingAndroidNumbers == null) {
+                runCatching { contacts.addContactIfAbsent(name, call.phoneNumber) }
+            } else {
+                runCatching {
+                    contacts.addContact(name, call.phoneNumber)
+                    existingAndroidNumbers += call.normalizedNumber
+                }
+            }
+        }
+        return customer.copy(id = id)
     }
 
     fun nextAvailableGeneratedNumber(): Int = contacts.nextAvailableCustomerNumber()
+    fun existingAndroidNumbers(): MutableSet<String> = contacts.existingNormalizedNumbers().toMutableSet()
     fun isAndroidContact(number: String): Boolean = contacts.contactExists(number)
+    fun renameAndroidContact(number: String, name: String): Boolean = contacts.renameExistingContact(number, name)
+    fun frequentAndroidContactName(number: String): String? = contacts.frequentCustomerName(number)
+    fun nextAvailableFrequentNumber(): Int = contacts.nextAvailableFrequentCustomerNumber()
+    fun renameFrequentAndroidContacts(numbers: List<String>): Map<String, String> =
+        contacts.renameFrequentContacts(numbers)
+
+    suspend fun backfillGeneratedContactNames(): Int {
+        val renamed = contacts.backfillGeneratedContactNames()
+        renamed.forEach { (normalized, name) -> customerDao.updateNameByNormalized(normalized, name) }
+        return renamed.size
+    }
 
     suspend fun save(customer: CustomerEntity) = customerDao.update(customer)
     suspend fun ignore(number: String, normalized: String) = customerDao.insertIgnored(IgnoredNumberEntity(normalized, number, System.currentTimeMillis()))
     suspend fun isIgnored(normalized: String): Boolean = customerDao.findIgnored(normalized) != null
     suspend fun findByNormalized(normalized: String): CustomerEntity? = customerDao.findByNormalized(normalized)
-    suspend fun addToAndroidContacts(customer: CustomerEntity) = contacts.addContact(customer.name, customer.phoneNumber)
+    suspend fun indexFrequentContact(call: CallHistoryEntity, name: String, totalCalls: Int) {
+        val existing = customerDao.findByNormalized(call.normalizedNumber)
+        if (existing != null) {
+            customerDao.update(existing.copy(name = name, totalCalls = maxOf(existing.totalCalls, totalCalls)))
+            return
+        }
+        customerDao.insertOrDuplicate(
+            CustomerEntity(
+                name = name,
+                phoneNumber = call.phoneNumber,
+                normalizedNumber = call.normalizedNumber,
+                dateAdded = System.currentTimeMillis(),
+                lastCallDate = call.callDate,
+                lastCallDuration = call.durationSeconds,
+                whatsappAvailable = whatsAppChecker.canOpenChat(call.normalizedNumber),
+                totalCalls = totalCalls
+            )
+        )
+    }
+    suspend fun addToAndroidContacts(customer: CustomerEntity) =
+        contacts.addContactIfAbsent(customer.name, customer.phoneNumber)
     suspend fun setGroup(customerId: Long, groupId: Long?) = customerDao.updateGroup(customerId, groupId)
 }

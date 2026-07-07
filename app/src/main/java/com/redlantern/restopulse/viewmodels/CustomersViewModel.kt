@@ -8,14 +8,18 @@ import com.redlantern.restopulse.models.CustomerFilter
 import com.redlantern.restopulse.utils.DateTimeUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class CustomersViewModel @Inject constructor(
     private val repository: CustomerRepository,
@@ -25,7 +29,11 @@ class CustomersViewModel @Inject constructor(
     val filter = MutableStateFlow(CustomerFilter.ALL)
 
     val customers: StateFlow<List<CustomerEntity>> = combine(
-        query.flatMapLatest { repository.search(it) },
+        query
+            .debounce(200)
+            .map(String::trim)
+            .distinctUntilChanged()
+            .flatMapLatest { repository.search(it) },
         filter
     ) { list, activeFilter -> list.filterBy(activeFilter) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

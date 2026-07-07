@@ -20,6 +20,10 @@ class CallLogSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = runCatching {
         val latest = calls.importLatest()
+        if (latest != null) {
+            // Contact-provider failures are isolated so normal call sync remains healthy.
+            runCatching { calls.promoteIfNowFrequent(latest.normalizedNumber) }
+        }
         if (latest != null &&
             customers.findByNormalized(latest.normalizedNumber) == null &&
             !customers.isAndroidContact(latest.phoneNumber) &&

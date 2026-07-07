@@ -6,6 +6,7 @@ data class DashboardStats(
     val callsToday: Int = 0,
     val whatsappCustomers: Int = 0,
     val nonWhatsappCustomers: Int = 0,
+    val frequentCustomers: Int = 0,
     val duplicatesPrevented: Int = 0,
     val marketingGroups: Int = 0,
     val exportStatus: String = "Ready"

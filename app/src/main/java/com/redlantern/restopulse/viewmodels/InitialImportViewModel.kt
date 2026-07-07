@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.redlantern.restopulse.data.repository.CallRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface InitialImportState {
     data object Idle : InitialImportState
@@ -29,7 +31,9 @@ class InitialImportViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = InitialImportState.Importing
             _state.value = runCatching {
-                calls.importAllAndCreateContacts()
+                withContext(Dispatchers.IO) {
+                    calls.importAllAndCreateContacts()
+                }
                 InitialImportState.Complete
             }.getOrElse { InitialImportState.Failed(it.message ?: it.javaClass.simpleName) }
         }
