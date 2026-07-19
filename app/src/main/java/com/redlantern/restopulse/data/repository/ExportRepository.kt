@@ -20,22 +20,59 @@ class ExportRepository @Inject constructor(
     private val customers: CustomerRepository,
     private val settings: SettingsRepository
 ) {
-    suspend fun export(format: ExportFormat): Intent {
+    suspend fun export(format: ExportFormat, namePrefix: String = ""): Intent {
+        val prefix = namePrefix.trim()
         val list = customers.observeCustomers().first()
+            .filter { prefix.isBlank() || it.name.trimStart().startsWith(prefix, ignoreCase = true) }
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, "red-lantern-customers.${format.extension}")
+        val suffix = prefix
+            .replace(Regex("[^A-Za-z0-9_-]+"), "-")
+            .trim('-')
+            .take(40)
+            .takeIf { it.isNotBlank() }
+            ?.let { "-$it" }
+            .orEmpty()
+        val file = File(dir, "red-lantern-customers$suffix.${format.extension}")
         when (format) {
-            ExportFormat.CSV, ExportFormat.EXCEL -> file.writeText(list.toCsv(), Charsets.UTF_8)
+            ExportFormat.CSV -> file.writeText(list.toCsv(), Charsets.UTF_8)
+            ExportFormat.EXCEL -> file.writeText(list.toExcelXml(), Charsets.UTF_8)
             ExportFormat.VCF -> file.writeText(list.toVcf(), Charsets.UTF_8)
             ExportFormat.PDF -> writePdf(file, list)
         }
-        settings.setExportStatus("Exported ${format.extension.uppercase()}")
+        settings.setExportStatus("Exported ${list.size} contacts as ${format.extension.uppercase()}")
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         return Intent(Intent.ACTION_SEND)
             .setType(format.mimeType)
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
+
+    /** SpreadsheetML is a real Excel-readable workbook without a heavyweight XLS library. */
+    private fun List<CustomerEntity>.toExcelXml(): String {
+        val headers = listOf("Name", "Phone", "Normalized", "Tag", "Notes", "WhatsApp", "VIP", "Favorite", "Total Calls", "Address", "Location")
+        fun cell(value: Any?): String =
+            "<Cell><Data ss:Type=\"String\">${value.toString().xmlEscape()}</Data></Cell>"
+
+        return buildString {
+            appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+            appendLine("<?mso-application progid=\"Excel.Sheet\"?>")
+            appendLine("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">")
+            appendLine("<Worksheet ss:Name=\"Contacts\"><Table>")
+            appendLine("<Row>${headers.joinToString("") { cell(it) }}</Row>")
+            this@toExcelXml.forEach { customer ->
+                val values = listOf(customer.name, customer.phoneNumber, customer.normalizedNumber, customer.customerTag, customer.notes, customer.whatsappAvailable, customer.vip, customer.favorite, customer.totalCalls, customer.address, customer.location)
+                appendLine("<Row>${values.joinToString("") { cell(it) }}</Row>")
+            }
+            appendLine("</Table></Worksheet></Workbook>")
+        }
+    }
+
+    private fun String.xmlEscape(): String = this
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
 
     private fun List<CustomerEntity>.toCsv(): String = buildString {
         appendLine("Name,Phone,Normalized,Tag,Notes,WhatsApp,VIP,Favorite,Total Calls,Address,Location")
